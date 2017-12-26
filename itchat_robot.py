@@ -13,34 +13,36 @@ import scripts.label_image2 as ai
 chatroom = "AILAB" # "剪刀、石頭、布"
 
 # Anti-Robot delay time , thanks to Rainy's great idea.
-nextDelay = 3
-nextDelay_msg = 'Next anti-robot delay time: %i seconds\n' % (nextDelay)
+nextDelay = 1
+def nextDelay_msg():
+    global nextDelay 
+    nextDelay = random.choice((2,3,3,4,4,4,5,5,5,5,6,6,6,7,7,8,9,10,11,12,13,14,15)) 
+    return 'Next anti-robot delay time: %i seconds\n' % (nextDelay)
 
 # Initialize debugger peforth 
 peforth.ok(loc=locals(),cmd='''
     :> [0] value main.locals // ( -- dict ) main locals
     \ Check ffmpeg, ffprobe, the needed 'download' directory, and the neural network model 
-    dos ffmpeg -version
-    [if] cr ." Fatal error! ffmpeg not found which is used to convert pictures." cr bye [then]
-    dos ffprobe -version
-    [if] cr ." Fatal error! ffprobe not found which is for pictures' duration." cr bye [then]
-    dos dir download 
-    [if] cr ." Fatal error! 'download' directory not found." cr bye [then]
-    dos dir tf_files\models\mobilenet_v1_1.0_224_frozen.tgz 
-    dos dir tf_files\models\mobilenet_v1_0.50_224_frozen.tgz 
-    or \ only one model needed but I have them downloaded already so check them all
-    [if] cr 
-         ." Fatal error! neural network model not found." cr 
-         ."   tf_files\models\mobilenet_v1_1.0_224_frozen.tgz " cr
-         ."   tf_files\models\mobilenet_v1_0.50_224_frozen.tgz" cr
-         bye [then]
+        dos ffmpeg -version
+        [if] cr ." Fatal error! ffmpeg not found which is used to convert pictures." cr bye [then]
+        dos ffprobe -version
+        [if] cr ." Fatal error! ffprobe not found which is for pictures' duration." cr bye [then]
+        dos dir download 
+        [if] cr ." Fatal error! 'download' directory not found." cr bye [then]
+        dos dir tf_files\models\mobilenet_v1_1.0_224_frozen.tgz 
+        dos dir tf_files\models\mobilenet_v1_0.50_224_frozen.tgz 
+        or \ only one model needed but I have them downloaded already so check them all
+        [if] cr 
+             ." Fatal error! neural network model not found." cr 
+             ."   tf_files\models\mobilenet_v1_1.0_224_frozen.tgz " cr
+             ."   tf_files\models\mobilenet_v1_0.50_224_frozen.tgz" cr
+             bye [then]
     \ define variables
-    __main__ :> chatroom constant chatroom // ( -- text ) The working chatroom NickName
-    __main__ :> nextDelay constant nextDelay // ( -- int ) Anti-robot delay time
-    none value locals
-    none value msg
+        import time constant time // ( -- module )
+        none value locals // ( -- dict ) at each breakpoint
+        none value msg // ( -- obj ) itchat dynamic msg package 
     \ redefine the 'bye' command to logout itchat first
-    : bye main.locals :> ['itchat'].logout() bye ; 
+        : bye main.locals :> ['itchat'].logout() bye ; 
     exit \ Don't forget this!!
     ''')  
     
@@ -52,11 +54,11 @@ def send_chunk(text, send, pcs=2000):
     s = text
     while True:
         if len(s)>pcs:
-            time.sleep(3)  # Anti-Robot delay 
+            time.sleep(random.choice((3,4,4,5,5,5,5,6,6,6,7,7,8,9,10)))  # Anti-Robot delay 
             print(s[:pcs]); 
             send(s[:pcs])
         else:
-            time.sleep(3)  # Anti-Robot delay 
+            # normal case already delaied before calling send_chunk()
             print(s); 
             send(s)
             break
@@ -78,13 +80,13 @@ def console(msg,cmd):
             errmsg = "Failed! : {}".format(err)
             peforth.vm.dictate("display-on")
             time.sleep(nextDelay)  # Anti-Robot delay 
-            send_chunk(errmsg + nextDelay_msg + "\nOK", msg.user.send)
+            send_chunk(errmsg + nextDelay_msg() + "\nOK", msg.user.send)
         else:
             # Normal cases 
             peforth.vm.dictate("display-on screen-buffer")
             screen = peforth.vm.pop()[0]
             time.sleep(nextDelay)  # Anti-Robot delay 
-            send_chunk(screen + nextDelay_msg + "\nOK", msg.user.send)
+            send_chunk(screen + nextDelay_msg() + "\nOK", msg.user.send)
 
 #        
 # 讓 Inception V3 Transfered Learning 看照片，回答 剪刀、石頭、布
@@ -100,7 +102,7 @@ def predict(msg):
     results += ai.predict("1.png")
     peforth.vm.dictate("dos del {}".format(pathname)+"\ndrop\n")
     time.sleep(nextDelay)  # Anti-Robot delay 
-    send_chunk(results + nextDelay_msg, msg.user.send)
+    send_chunk(results + nextDelay_msg(), msg.user.send)
 
 @itchat.msg_register((ATTACHMENT,VIDEO,VOICE,RECORDING), isGroupChat=True)
 def attachment(msg):
@@ -108,15 +110,16 @@ def attachment(msg):
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         msg.download('download\\' + msg.fileName)
         time.sleep(nextDelay)  # Anti-Robot delay 
-        send_chunk('Attachment: %s \nreceived at %s\n' % (msg.fileName,time.ctime()) + nextDelay_msg, msg.user.send)
+        send_chunk('Attachment: %s \nreceived at %s\n' % (msg.fileName,time.ctime()) + nextDelay_msg(), msg.user.send)
 
 @itchat.msg_register(TEXT, isGroupChat=True)
 def chat(msg):
     if peforth.vm.debug==44: peforth.ok('44> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         if msg.isAt: 
-            cmd = msg.text.split("\n",maxsplit=1)[1] # remove the first line: @nickName ...
-            console(msg, cmd)                        # 避免帶有空格的 nickName 惹問題
+            cmd = msg.text + '\n' # 保證可以 split() 
+            cmd = cmd.split("\n",maxsplit=1)[1] # remove the first line: @nickName ...
+            console(msg, cmd)                   # 避免帶有空格的 nickName 惹問題
         else:    
             # Shown on the robot computer
             print(time.ctime(msg.CreateTime), end=" ")
@@ -131,18 +134,19 @@ def picture(msg):
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         predict(msg)
 
+peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime() . cr')
 # peforth.vm.debug = 44
 if peforth.vm.debug==66: peforth.ok('66> ',loc=locals(),cmd=":> [0] to locals cr")  # breakpoint    
 itchat.auto_login(hotReload=False)
 itchat.run(debug=True, blockThread=True)
-peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr')
+peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime() . cr')
 
 '''
 
 # --------------- Playground ---------------------------------------------------
-# Setup the playground for testing without itchat (avoid the need to login)
-
-\ 弄出個 msg 來供 function test 測試用，而無須 itchat 連線。
+\ Ynote: "Itchat Robot Toolkit 在這兒集中管理"
+\ Setup the playground for testing without itchat (avoid the need to login)
+\ 弄出個 msg 來供 function test 測試以及 debug 用，而無須 itchat 連線。
 
     <accept>
     <py>
@@ -152,30 +156,46 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr')
         pass
     msg.user = _    
     msg.user.send = str # 吃掉 argument 
-    msg.user.NickName = 'A believer'    
+    msg.user.NickName = 'AILAB'    
     msg.isAt = True
     def _():
         print('msg.user.verify() ... pass')
     msg.user.verify = _
-    msg.fileName = '20171222153010.jpg'
+    msg.fileName = 'test.jpg'
     msg.type = 'fil' # also 'img'(image), 'vid'(video)
     def _(fileName):
         print('Downloaded %s from WeChat cloud' % fileName)
     msg.download = _
     msg.text = "Message text from the WeChat cloud"
     msg.Text = msg.text
+    msg.ActualUserName = "dynamic-id1122aabb"
+    msg.User = {}
+    msg.User['MemberList'] = []
+    def _():
+        pass
+    _.UserName = msg.ActualUserName
+    _.NickName = "believer"
+    msg.User['MemberList'].append(_)
     push(msg)
     </py> to msg
-    </accept> dictate
-    \ Introduce peforth value msg to peforth global 
     msg __main__ :: peforth.projectk.msg=pop(1)
+    \ Introduce peforth value msg to peforth global 
+    </accept> dictate
 
     \ 應用例
     
     __main__ :> predict(msg) . cr
-    __main__ :: console(msg,".s")
+    __main__ :> console(msg,".s")
+    __main__ :> attachment(msg)
+    __main__ :> picture(msg)
+    msg :: text="@版主\nwords" __main__ :> chat(msg)
+    \ 把下面的遠端來灌程式, e.g. check getfile 等整個弄成 ss 
+    ss msg :: text="@版主\n"+pop(1) __main__ :> chat(msg)
+    msg :: text="@版主\ncheck" __main__ :> chat(msg)
 
+    
     \ 瞭解這個虛擬的 msg 
+    \ See also: "itchat msg 解析.note"
     
     Examine> msg . cr
     <function compyle_anonymous.<locals>.msg at 0x0000020FADBAF400>
@@ -216,17 +236,19 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr')
 \ itchat robot toolkit 由遠端灌過來給 robot 執行的程式集
 \ Ynote: Itchat Robot Toolkit 在這兒集中管理
 
-    \ 主程式裡要提供以下常數與變數的 placeholder
-    \ __main__ :> chatroom constant chatroom // ( -- text ) The working chatroom NickName
-    \ __main__ :> nextDelay constant nextDelay // ( -- int ) Anti-robot delay time
-    \ none value msg
-
-    import time constant time // ( -- module )
+    \ 一開始設定先報時
     cr time :> ctime() . cr \ print recent time on Robot PC when making this setting
     
-    \ 到了 runtime 憑 msg.user.NickName 才知道 focused chatroom 是那個，因此 msg
-    \ 動態地要用到。FORTH value msg 在 console() 臨時準備好，到了這裡時已經
-    \ available 了。
+    \ 到了 runtime 憑 msg.user.NickName 才知道 active chatroom 是那個，因此 msg
+    \ 動態地要用到。主程式裡要提供以下變數：
+    \   none value msg
+    \ 進 console() 以及 breakpoints 要填好 msg
+    \   peforth.vm.push(msg); 
+    \   peforth.vm.dictate("to msg")  # Availablize msg in peforth interpreter
+
+    \ 主程式的設定與變數參考下來
+    __main__ :> chatroom constant chatroom // ( -- text ) The working chatroom NickName
+    : nextDelay __main__ :> nextDelay ; // ( -- int ) Anti-robot delay time before every send()
     
     \ get itchat module object
     py> sys.modules['itchat'] constant itchat // ( -- module ) WeChat automation
@@ -234,16 +256,24 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr')
     \ get PIL graph tool
     import PIL.ImageGrab constant im // ( -- module ) PIL.ImageGrab
 
-    \ @Damion
-    \ itchat :> search_chatrooms(pop())[0].nickName . cr
-    \ 
-    \ __main__ :> chatroom ( NickName of the focused chatroom  )
-    \ itchat :> search_chatrooms(pop()) constant chatrooms 
-    \ chatrooms count ?dup [if] dup [for] 
+    \ 複習每個東西
+    \ __main__ :> chatroom \ 主程式指定要 focus 的 chatroom nickName
+    \ msg :> user \ 本 active chatroom 的 object 
+    \ msg.user.NickName # chatroom name
+    \ 當前發言者的 NickName 要用以下三個東西輾轉找出來
+    \   msg.ActualUserName # the 發言者的 dynamic ID
+    \   msg.User['MemberList'][i].UserName # a member's dynamic ID
+    \   msg.User['MemberList'][i].NickName # a member's nickname
+    \ itchat :> search_chatrooms(pop()) constant chatrooms  \ 全部 chatrooms 這沒什麼意義
+    \ itchat :> search_chatrooms(pop())[0].nickName \ 這沒什麼意義
+    \ chatrooms count ?dup [if] dup [for] \ 這也沒什麼意義
     \     dup t@ - ( COUNT i ) . space ( COUNT ) 
     \ [next] drop [then]
-    \ 
-    \ itchat :> search_chatrooms(pop())[0] constant focusedChatroom // ( -- obj ) focused chatroom object
+
+    \ 以下自訂命令要遵守的規則
+    \ a) 必須合併所有的 message 做一次 send()
+    \ b) 這個唯一的 send() 之前必須自己做 anti-robot delay 
+    \ c) console() 最終會重算 nextDelay time 且印出去，這裡不必做。
     
     : check // ( -- ) Get robot pc desktop screenshot
         cr time :> ctime() . cr \ print the recent time on the robot pc

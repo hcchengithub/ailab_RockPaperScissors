@@ -1,4 +1,9 @@
 android/
 inception/
 tf_files/
+scripts/__pycache__/
 
+
+*.png
+*.jpg
+*.jpeg
