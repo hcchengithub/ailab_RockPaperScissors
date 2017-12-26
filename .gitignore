@@ -2,7 +2,7 @@ android/
 inception/
 tf_files/
 scripts/__pycache__/
-
+download/
 
 *.png
 *.jpg
