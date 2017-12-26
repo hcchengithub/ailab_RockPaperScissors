@@ -13,23 +13,19 @@ import scripts.label_image2 as ai
 chatroom = "剪刀、石頭、布"
 
 # Anti-Robot delay time , thanks to Rainy's great idea.
-nextDelay = random.choice(range(3,18)) 
+nextDelay = 3
+nextDelay_msg = 'Next anti-robot delay time: %i seconds\n' % (nextDelay)
 
-# import inception
-# inception.maybe_download()
-# model = inception.Inception() # The Inception v3 model 
-
-# Inhibit 'bye' command, it terminates DOSBox session immediately 
-# and leaves 'bye' in msg! Only a re-login can resolve it. To avoid this,
-# decorator must return instead of doing the 'bye' command directly.
+# Initialize debugger peforth 
 peforth.ok(loc=locals(),cmd='''
-    :> [0] constant main.locals // ( -- dict ) main locals
-    none value console.locals // ( -- dict ) console() locals 
+    :> [0] value main.locals // ( -- dict ) main locals
+    none value locals
+    none value msg
     : bye main.locals :> ['itchat'].logout() bye ; 
     exit
     ''')  
     
-# Send message to friend or chatroom depends on the given 'send'
+# Sending message to friend or chatroom depends on the given 'send'
 # function. It can be itchat.send or msg.user.send up to the caller.
 # WeChat text message has a limit at about 2000 utf-8 characters so
 # we need to split a bigger string into chunks.
@@ -44,83 +40,78 @@ def send_chunk(text, send, pcs=2000):
         s = s[pcs:]    
 
 # Console is a peforth robot that listens and talks.
-# Used in chatting with friends and in a chatroom.
+# Used in chatting with both friends and chatrooms.
 def console(msg,cmd):
     if cmd:
-        print(cmd)  # already on the remote side, don't need to echo 
-        global nextDelay
-        nextDelay_msg = '\nNext anti-robot delay time: %i seconds\n' % (nextDelay)
-        if peforth.vm.debug==11: peforth.ok('11> ',loc=locals(),cmd=":> [0] constant loc11 cr")  # breakpoint    
-        
+        print(cmd)  # already on the remote side, don't need to echo. 
+        if peforth.vm.debug==11: peforth.ok('11> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
         # re-direct the display to peforth screen-buffer
         peforth.vm.dictate("display-off")  
         try:
             peforth.vm.push((locals(),globals(),'console prompt'))
-            peforth.vm.dictate(":> [0] to console.locals " + cmd)
-            # peforth.ok('OK ', loc=locals(),
-            #     cmd=":> [0] to console.locals " + cmd + "\n exit")
+            peforth.vm.dictate(":> [0] to locals " + cmd)
         except Exception as err:
             errmsg = "Failed! : {}".format(err)
             peforth.vm.dictate("display-on")
+            time.sleep(nextDelay)  # Anti-Robot delay 
             send_chunk(errmsg + nextDelay_msg, msg.user.send)
         else:
+            # Normal cases 
             peforth.vm.dictate("display-on screen-buffer")
             screen = peforth.vm.pop()[0]
+            time.sleep(nextDelay)  # Anti-Robot delay 
             send_chunk(screen + nextDelay_msg, msg.user.send)
 
 #        
 # 讓 Inception V3 Transfered Learning 看照片，回答 剪刀、石頭、布
 #        
 def predict(msg):
+    if peforth.vm.debug==22: peforth.ok('22> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     results = time.ctime() + '\n'
     results += 'Google Inception V3 Transfered Learning thinks it is:\n'
     pathname = 'download\\' + msg.fileName # 照片放在 working directory/download 下
     msg.download(pathname)  
-    if peforth.vm.debug==22: peforth.ok('22a> ',loc=locals(),cmd=":> [0] constant loc22a cr")  # breakpoint    
-    peforth.vm.dictate("dos ffmpeg -i {} -y 1.png".format(pathname)+"\ndrop")  
-    # if msg.fileName.strip().lower().endswith((".jpeg",'.jpg','.png')):
-    #     results += ai.predict(('download\\'+ msg.fileName).strip())
-    # else:
-    #     results += 'Ooops! jpeg pictures only, please. {} is not one.\n'.format(msg.fileName)
+    # TensorFlow 的 tf.image.decode_bmp/jpen/png/pcm 很差，改用 ffmpeg 
+    peforth.vm.dictate("dos ffmpeg -i {} -y 1.png".format(pathname)+"\ndrop\n")  
     results += ai.predict("1.png")
-    if peforth.vm.debug==22: peforth.ok('22b> ',loc=locals(),cmd=":> [0] constant loc22b cr")  # breakpoint    
-    return results
-
-@itchat.msg_register(ATTACHMENT, isGroupChat=True)
-def _a(msg):
-    global nextDelay
+    peforth.vm.dictate("dos del {}".format(pathname)+"\ndrop\n")
     time.sleep(nextDelay)  # Anti-Robot delay 
-    nextDelay = random.choice(range(3,18))
-    nextDelay_msg = '\nNext anti-robot delay time: %i seconds\n' % (nextDelay)
-    if peforth.vm.debug==33: peforth.ok('33> ',loc=locals(),cmd=":> [0] constant loc33 cr")  # breakpoint    
+    send_chunk(results + nextDelay_msg, msg.user.send)
+
+@itchat.msg_register((ATTACHMENT,VIDEO,VOICE,RECORDING), isGroupChat=True)
+def attachment(msg):
+    if peforth.vm.debug==33: peforth.ok('33> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         msg.download('download\\' + msg.fileName)
+        time.sleep(nextDelay)  # Anti-Robot delay 
         send_chunk('Attachment: %s \nreceived at %s\n' % (msg.fileName,time.ctime()) + nextDelay_msg, msg.user.send)
 
 @itchat.msg_register(TEXT, isGroupChat=True)
-def _b(msg):
-    if peforth.vm.debug==44: peforth.ok('44> ',loc=locals(),cmd=":> [0] constant loc44 cr")  # breakpoint    
+def chat(msg):
+    if peforth.vm.debug==44: peforth.ok('44> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         if msg.isAt: 
-            time.sleep(nextDelay)  # Anti-Robot delay 
             cmd = msg.text.split("\n",maxsplit=1)[1] # remove the first line: @nickName ...
             console(msg, cmd)                        # 避免帶有空格的 nickName 惹問題
+        else:    
+            # Shown on the robot computer
+            print(time.ctime(msg.CreateTime), end=" ")
+            for i in msg.User['MemberList']:
+                if i.UserName == msg.ActualUserName:
+                    print(i.NickName)
+            print(msg.text)
 
 @itchat.msg_register(PICTURE, isGroupChat=True)
-def _c(msg):
-    global nextDelay
-    time.sleep(nextDelay)  # Anti-Robot delay 
-    nextDelay = random.choice(range(3,18))
-    nextDelay_msg = '\nNext anti-robot delay time: %i seconds\n' % (nextDelay)
-    if peforth.vm.debug==55: peforth.ok('55> ',loc=locals(),cmd=":> [0] constant loc55 cr")  # breakpoint    
+def picture(msg):
+    if peforth.vm.debug==55: peforth.ok('55> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
-        send_chunk(predict(msg) + nextDelay_msg, msg.user.send)
+        predict(msg)
 
-peforth.vm.debug = 22
-peforth.ok('Examine> ',loc=locals(),cmd=':> [0] value locals')
-if peforth.vm.debug==66: peforth.ok('66> ',loc=locals(),cmd=":> [0] constant loc66 cr")  # breakpoint    
+# peforth.vm.debug = 44
+if peforth.vm.debug==66: peforth.ok('66> ',loc=locals(),cmd=":> [0] to locals cr")  # breakpoint    
 itchat.auto_login(hotReload=False)
-itchat.run(debug=False, blockThread=True)
+itchat.run(debug=True, blockThread=True)
+peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals')
 
 # Bug list
 # [x] 正常對話不需 delay --> FP @ v6
