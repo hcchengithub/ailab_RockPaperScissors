@@ -12,6 +12,13 @@ import scripts.label_image2 as ai
 # WeChat chatroom name 
 chatroom = "AILAB" # "剪刀、石頭、布"
 
+# Author or PIC name, who can still remote control the robot PC
+# when chatroom nickName is not match
+PIC = ("hcchen5600",)
+    # 這裡很好玩,上面這個逗點如果漏掉, PIC 就變成是個 str 結果連 hc 也算！那就錯了。
+    # @版主 增加 陳厚成0922 進 PIC 名單
+    # __main__ :: PIC=("hcchen5600","陳厚成0922")
+    
 # Anti-Robot delay time , thanks to Rainy's great idea.
 nextDelay = 1
 def nextDelay_msg():
@@ -114,12 +121,15 @@ def attachment(msg):
 
 @itchat.msg_register(TEXT, isGroupChat=True)
 def chat(msg):
-    if peforth.vm.debug==44: peforth.ok('44> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
-    if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
+    def myConsole(msg):
+        # 本 chat 當作 peforth 命令處理
+        cmd = msg.text + '\n' # 保證可以 split() 
+        cmd = cmd.split("\n",maxsplit=1)[1] # remove the first line: @nickName ...
+        console(msg, cmd)                   # 避免帶有空格的 nickName 惹問題
+    def chat(msg):
+        # 處裡本 chat, @版主 時當 peforth 命令處理否則只是在 robot PC 上顯示
         if msg.isAt: 
-            cmd = msg.text + '\n' # 保證可以 split() 
-            cmd = cmd.split("\n",maxsplit=1)[1] # remove the first line: @nickName ...
-            console(msg, cmd)                   # 避免帶有空格的 nickName 惹問題
+            myConsole(msg)
         else:    
             # Shown on the robot computer
             print(time.ctime(msg.CreateTime), end=" ")
@@ -127,14 +137,25 @@ def chat(msg):
                 if i.UserName == msg.ActualUserName:
                     print(i.NickName)
             print(msg.text)
-
+    if peforth.vm.debug==44: peforth.ok('44> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
+    if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
+        chat(msg)
+    else:
+        # 開個後門，否則 Chatroom nickName 改了就控制不到。
+        # 當 Chatroom nickName 只有部分符合時，並且只針對 PIC 的發言處理。
+        # 非 @版主 也在 Robot PC 上顯示出來是為了確認 Robot 有反應。
+        if msg.user.NickName.find(chatroom) != -1:
+            for i in msg.User['MemberList']:
+                if peforth.vm.debug==44: peforth.ok('44a> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
+                if (i.UserName == msg.ActualUserName) and (i.NickName in PIC):
+                    chat(msg)
+                    
 @itchat.msg_register(PICTURE, isGroupChat=True)
 def picture(msg):
     if peforth.vm.debug==55: peforth.ok('55> ',loc=locals(),cmd=":> [0] to locals locals :> ['msg'] to msg cr")  # breakpoint
     if msg.user.NickName==chatroom: # 只在特定的 chatroom 工作，過濾掉其他的。
         predict(msg)
 
-peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime() . cr')
 # peforth.vm.debug = 44
 if peforth.vm.debug==66: peforth.ok('66> ',loc=locals(),cmd=":> [0] to locals cr")  # breakpoint    
 itchat.auto_login(hotReload=False)
@@ -155,6 +176,7 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime(
     def _():
         pass
     msg.user = _    
+    msg.CreateTime = 1504452397.47364
     msg.user.send = str # 吃掉 argument 
     msg.user.NickName = 'AILAB'    
     msg.isAt = True
@@ -168,13 +190,21 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime(
     msg.download = _
     msg.text = "Message text from the WeChat cloud"
     msg.Text = msg.text
-    msg.ActualUserName = "dynamic-id1122aabb"
     msg.User = {}
     msg.User['MemberList'] = []
+    # user believer
+    msg.ActualUserName = "dynamic-id1122aabb"
     def _():
         pass
     _.UserName = msg.ActualUserName
     _.NickName = "believer"
+    msg.User['MemberList'].append(_)
+    # user hcchen5600
+    msg.ActualUserName = "mememe-hcchen5600"
+    def _():
+        pass
+    _.UserName = msg.ActualUserName
+    _.NickName = "hcchen5600"
     msg.User['MemberList'].append(_)
     push(msg)
     </py> to msg
@@ -290,4 +320,8 @@ peforth.ok('Examine> ',loc=locals(),cmd=':> [0] to main.locals cr time :> ctime(
         msg :> user.send(pop()) \ send to chatroom so everybody gets it
         . cr ; \ shows the responsed message
         /// In case source code were modified on the robot pc.
+        
+[x] chatroom nickName 改過何時生效?
+    private AILAB --> AILAB 結果 --> 過幾秒之後生效，不是馬上也差不多了。
+    
 '''

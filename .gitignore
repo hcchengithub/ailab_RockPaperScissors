@@ -3,7 +3,7 @@ inception/
 tf_files/
 scripts/__pycache__/
 download/
-
+**/*.pyc
 *.png
 *.jpg
 *.jpeg
