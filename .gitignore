@@ -7,3 +7,4 @@ download/
 *.png
 *.jpg
 *.jpeg
+scripts/__pycache__/retrain.cpython-36.pyc
